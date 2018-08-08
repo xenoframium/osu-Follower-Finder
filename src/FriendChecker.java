@@ -30,6 +30,14 @@ public class FriendChecker {
 
     String tryAddFriend(String userId){
         String responseHTML = HttpUtil.sendGet(client, "https://osu.ppy.sh/u/"+userId);
+
+        if (!Main.isLoggedIn(responseHTML)) {
+            Main.login();
+            System.out.println("Session expired, relogging...");
+        }
+
+        responseHTML = HttpUtil.sendGet(client, "https://osu.ppy.sh/u/"+userId);
+
         String addFriendMatcher = "<a href='(\\/u\\/.+?\\?a=add&localUserCheck=.+?)'";
 
         Pattern p = Pattern.compile(addFriendMatcher);
@@ -39,12 +47,26 @@ public class FriendChecker {
             responseHTML = HttpUtil.sendGet(client, url);
             return responseHTML;
         } else {
+            String removeFriendMatcher = "<a href='(\\/u\\/.+?\\?a=remove&localUserCheck=.+?)'";
+
+            Pattern pp = Pattern.compile(removeFriendMatcher);
+            Matcher mm = p.matcher(responseHTML);
+            if (m.find()) {
+                System.out.println("Unknown Error At: " + responseHTML);
+            }
             return null;
         }
     }
 
     boolean tryRemoveFriend(String userId){
         String responseHTML = HttpUtil.sendGet(client, "https://osu.ppy.sh/u/"+userId);
+
+        if (!Main.isLoggedIn(responseHTML)) {
+            Main.login();
+            System.out.println("Session expired, relogging...");
+        }
+
+        responseHTML = HttpUtil.sendGet(client, "https://osu.ppy.sh/u/"+userId);
         String removeFriendMatcher = "<a href='(\\/u\\/.+?\\?a=remove&localUserCheck=.+?)'";
 
         Pattern p = Pattern.compile(removeFriendMatcher);
@@ -54,6 +76,13 @@ public class FriendChecker {
             responseHTML = HttpUtil.sendGet(client, url);
             return true;
         } else {
+            String addFriendMatcher = "<a href='(\\/u\\/.+?\\?a=add&localUserCheck=.+?)'";
+
+            Pattern pp = Pattern.compile(removeFriendMatcher);
+            Matcher mm = p.matcher(responseHTML);
+            if (m.find()) {
+                System.out.println("Unknown Error At: " + responseHTML);
+            }
             return false;
         }
     }

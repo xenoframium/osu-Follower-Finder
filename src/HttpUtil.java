@@ -37,6 +37,12 @@ public class HttpUtil {
         while (!done) {
             try {
                 response = client.execute(request);
+                if (response.getStatusLine().getStatusCode() >= 400) {
+                    System.out.println("Received Code " + response + " while sending GET request, retrying in 1 second...");
+                    Thread.sleep(1000);
+                    continue;
+                }
+
                 done = true;
 
                 BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
@@ -73,6 +79,12 @@ public class HttpUtil {
         while (!done) {
             try {
                 response = client.execute(post);
+                if (response.getStatusLine().getStatusCode() >= 400) {
+                    System.out.println("Received Code " + response + " while sending POST request, retrying in 1 second...");
+                    Thread.sleep(1000);
+                    continue;
+                }
+
                 done = true;
 
                 BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));

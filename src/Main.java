@@ -7,10 +7,12 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.cookie.BasicClientCookie;
 import org.apache.http.message.BasicNameValuePair;
 
+import javax.security.auth.login.LoginException;
 import javax.swing.*;
 import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -40,9 +42,11 @@ public class Main {
     private static JLabel stepLabel = null;
     private static JProgressBar progressBar = null;
     private static JTextField startFromUserField = null;
+    private static JRadioButton countryButton = null;
 
     private static int startFromUser = 0;
     private static boolean hasLoggedIn = false;
+    private static boolean isCountryRanking = true;
 
     private static CountDownLatch verifyLatch = new CountDownLatch(1);
 
@@ -106,7 +110,7 @@ public class Main {
         JButton runButton = new JButton("Find Followers!");
         c.gridx = 2;
         c.gridy = 0;
-        c.gridheight = 3;
+        c.gridheight = 1;
         c.fill = GridBagConstraints.BOTH;
         runButton.addActionListener(new ActionListener() {
             @Override
@@ -139,6 +143,21 @@ public class Main {
             }
         });
         panel.add(runButton, c);
+
+        countryButton = new JRadioButton("Country");
+        countryButton.setSelected(true);
+        c.gridx = 2;
+        c.gridy = 1;
+        panel.add(countryButton, c);
+
+        JRadioButton globalButton = new JRadioButton("Global");
+        c.gridx = 2;
+        c.gridy = 2;
+        panel.add(globalButton, c);
+
+        ButtonGroup toggleGroup = new ButtonGroup();
+        toggleGroup.add(countryButton);
+        toggleGroup.add(globalButton);
 
         JLabel startFromUser = new JLabel("Start From Rank #:");
         c.gridx = 0;
@@ -314,6 +333,8 @@ public class Main {
         }
     }
 
+
+
     public static void beginQuery() {
         BasicClientCookie cookie = new BasicClientCookie("osu_site_v", "old");
         cookie.setDomain(".osu.ppy.sh");
@@ -335,17 +356,24 @@ public class Main {
             throw new RuntimeException(e);
         }
 
+        isCountryRanking = countryButton.isSelected();
+
         //Lol concurrent arrays dont kill me please (although theres so many other things wrong with this code in general)
         List<String> userIds = Collections.synchronizedList(new ArrayList<>());
         List<String> userNames = Collections.synchronizedList(new ArrayList<>());
 
-        printToStepLabel(" Scanning Country Player Pages...");
+        printToStepLabel(" Scanning Player Pages...");
 
         //Lol apparently ip limited so it doesnt even matter if you have 1 or 10 threads, maybe ill bother with vpn someday who knows
         AtomicInteger pageCounter = new AtomicInteger(0);
         progressBar.setMinimum(1);
 
-        String res = HttpUtil.sendGet(originalClient, "https://osu.ppy.sh/p/pp/?m=0&c="+country);
+        String res;
+        if (isCountryRanking) {
+            res = HttpUtil.sendGet(originalClient, "https://osu.ppy.sh/p/pp/?m=0&c="+country);
+        } else {
+            res = HttpUtil.sendGet(originalClient, "https://osu.ppy.sh/p/pp");
+        }
         Pattern p = Pattern.compile("<div class=\"pagination\">Displaying 1 to [0-9]+ of (.+?) results\\.<br\\/>");
         Matcher m = p.matcher(res);
         m.find();
@@ -357,7 +385,11 @@ public class Main {
             updateProgress(i);
             printToProgressLabel(String.format("Scanning Page (%d/%d)",i, numPages));
             try {
-                scanUsers(i, userIds, userNames);
+                if (isCountryRanking) {
+                    scanUsersCountry(i, userIds, userNames);
+                } else {
+                    scanUsersWorld(i, userIds, userNames);
+                }
             } catch(Exception e) {
                 e.printStackTrace();
                 i--;
@@ -377,6 +409,11 @@ public class Main {
             try {
                 updateProgress(i);
                 printToProgressLabel(String.format("Checking Player '%s' (%d/%d)", userNames.get(i), counter, numUsers));
+
+                if (userIds.get(i).toLowerCase().equals(username.toLowerCase())) {
+                    continue;
+                }
+
                 FriendChecker checker = new FriendChecker(createClient(), userIds.get(i));
                 boolean isNewFriend = checker.checkIsFriend();
                 if (isNewFriend) {
@@ -397,8 +434,23 @@ public class Main {
         progressLabel.setText("Links to Followers are Below.");
     }
 
-    private static void scanUsers(int page, List<String> userIds, List<String> usernames) {
+    private static void scanUsersCountry(int page, List<String> userIds, List<String> usernames) {
         String url = "https://osu.ppy.sh/p/pp/?c="+country+"&m=0&s=3&o=1&f=&page="+page;
+        String responseHTML = HttpUtil.sendGet(originalClient, url);
+
+        String userPattern = "href='\\/u\\/(.+?)'>(.+?)<\\/a><\\/td>";
+
+        Pattern p = Pattern.compile(userPattern);
+        Matcher m = p.matcher(responseHTML);
+
+        while (m.find()) {
+            userIds.add(m.group(1));
+            usernames.add(m.group(2));
+        }
+    }
+
+    private static void scanUsersWorld(int page, List<String> userIds, List<String> usernames) {
+        String url = "https://osu.ppy.sh/p/pp/?m=0&s=3&o=1&f=&page="+page;
         String responseHTML = HttpUtil.sendGet(originalClient, url);
 
         String userPattern = "href='\\/u\\/(.+?)'>(.+?)<\\/a><\\/td>";
@@ -435,13 +487,21 @@ public class Main {
         String responseHTML = HttpUtil.sendGet(originalClient, "https://osu.ppy.sh/u/"+userId);
 
         String countryPattern = "<a href='\\/p\\/pp\\?s=3&o=1&c=NZ&find="+username+"#jumpto'><img class='flag' title='.+?' src=\"\\/\\/s\\.ppy\\.sh\\/images\\/flags\\/(.+?)\\.gif\"";
-        Pattern r = Pattern.compile(countryPattern);
+        Pattern r = Pattern.compile(countryPattern, Pattern.CASE_INSENSITIVE);
         Matcher m = r.matcher(responseHTML);
         m.find();
         country = m.group(1);
     }
 
-    private static void login() {
+    public static boolean isLoggedIn(String html) {
+        String pattern = "<a class='login-open-button'><i class='icon-caret-down'><\\/i> Login<\\/a>";
+        Pattern p = Pattern.compile(pattern);
+        Matcher m = p.matcher(html);
+
+        return !m.find();
+    }
+
+    public static void login() {
         String url = "https://osu.ppy.sh/forum/ucp.php?mode=login";
 
         List<NameValuePair> parameters = new ArrayList<>();
@@ -461,18 +521,17 @@ public class Main {
         m.find();
         try {
             sid = m.group(1);
-        } catch(IllegalStateException e) {
+        } catch(Exception e) {
             throw new LoginFailException();
         }
 
-        String userIDPattern = "<div style=\"float:right; color: #666666;\">Welcome, <b><a href=\"\\/u\\/(.+?)\">";
-        r = Pattern.compile(userIDPattern);
+        String userIDPattern = "<a href=\"\\/u\\/(.+?)\">"+username+"<";
+        r = Pattern.compile(userIDPattern, Pattern.CASE_INSENSITIVE);
         m = r.matcher(responseHTML);
         m.find();
         userId = m.group(1);
 
         hasLoggedIn = true;
-        password = null;
     }
 
     private static void logout() {
