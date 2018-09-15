@@ -43,6 +43,10 @@ public class Main {
     private static JProgressBar progressBar = null;
     private static JTextField startFromUserField = null;
     private static JRadioButton countryButton = null;
+    private static JRadioButton osuModeButton = null;
+    private static JRadioButton taikoModeButton = null;
+    private static JRadioButton ctbModeButton = null;
+    private static JRadioButton maniaModeButton = null;
 
     private static int startFromUser = 0;
     private static boolean hasLoggedIn = false;
@@ -175,16 +179,53 @@ public class Main {
         c.fill = GridBagConstraints.HORIZONTAL;
         panel.add(startFromUserField, c);
 
-        stepLabel = new JLabel("Current Step:", SwingConstants.CENTER);
+        JPanel modePanel = new JPanel();
         c.gridx = 0;
         c.gridy = 3;
+        c.gridwidth = 3;
+        modePanel.setLayout(new GridBagLayout());
+        panel.add(modePanel, c);
+
+        ButtonGroup modeGroup = new ButtonGroup();
+        osuModeButton = new JRadioButton("osu!");
+        osuModeButton.setSelected(true);
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 1;
+        c.gridheight = 1;
+        c.fill = GridBagConstraints.NONE;
+        modePanel.add(osuModeButton, c);
+
+        taikoModeButton = new JRadioButton("taiko");
+        c.gridx = 1;
+        c.gridy = 0;
+        modePanel.add(taikoModeButton, c);
+
+        ctbModeButton = new JRadioButton("ctb");
+        c.gridx = 2;
+        c.gridy = 0;
+        modePanel.add(ctbModeButton, c);
+
+        maniaModeButton = new JRadioButton("mania");
+        c.gridx = 3;
+        c.gridy = 0;
+        modePanel.add(maniaModeButton, c);
+
+        modeGroup.add(osuModeButton);
+        modeGroup.add(taikoModeButton);
+        modeGroup.add(ctbModeButton);
+        modeGroup.add(maniaModeButton);
+
+        stepLabel = new JLabel("Current Step:", SwingConstants.CENTER);
+        c.gridx = 0;
+        c.gridy = 4;
         c.gridwidth = 3;
         c.gridheight = 1;
         panel.add(stepLabel, c);
 
         progressLabel = new JLabel("Enter Credentials", SwingConstants.CENTER);
         c.gridx = 0;
-        c.gridy = 4;
+        c.gridy = 5;
         c.gridwidth = 3;
         c.gridheight = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
@@ -192,14 +233,14 @@ public class Main {
 
         progressBar = new JProgressBar(0, 10);
         c.gridx = 0;
-        c.gridy = 5;
+        c.gridy = 6;
         c.gridwidth = 3;
         c.gridheight = 1;
         panel.add(progressBar, c);
 
         JLabel foundFriends = new JLabel("Found Followers:", SwingConstants.CENTER);
         c.gridx = 0;
-        c.gridy = 6;
+        c.gridy = 7;
         c.gridwidth = 3;
         c.gridheight = 1;
         panel.add(foundFriends, c);
@@ -209,7 +250,7 @@ public class Main {
         ((DefaultCaret)textArea.getCaret()).setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         scroll = new JScrollPane(textArea);
         c.gridx = 0;
-        c.gridy = 7;
+        c.gridy = 8;
         c.gridwidth = 3;
         c.gridheight = 1;
         panel.add(scroll, c);
@@ -434,8 +475,20 @@ public class Main {
         progressLabel.setText("Links to Followers are Below.");
     }
 
+    private static int getModeId() {
+        if (osuModeButton.isSelected()) {
+            return 0;
+        } else if (taikoModeButton.isSelected()) {
+            return 1;
+        } else if (ctbModeButton.isSelected()) {
+            return 2;
+        } else {
+            return 3;
+        }
+    }
+
     private static void scanUsersCountry(int page, List<String> userIds, List<String> usernames) {
-        String url = "https://osu.ppy.sh/p/pp/?c="+country+"&m=0&s=3&o=1&f=&page="+page;
+        String url = "https://osu.ppy.sh/p/pp/?c="+country+"&m=" + getModeId() + "&s=3&o=1&f=&page="+page;
         String responseHTML = HttpUtil.sendGet(originalClient, url);
 
         String userPattern = "href='\\/u\\/(.+?)'>(.+?)<\\/a><\\/td>";
@@ -450,7 +503,7 @@ public class Main {
     }
 
     private static void scanUsersWorld(int page, List<String> userIds, List<String> usernames) {
-        String url = "https://osu.ppy.sh/p/pp/?m=0&s=3&o=1&f=&page="+page;
+        String url = "https://osu.ppy.sh/p/pp/?m=" + getModeId() + "&s=3&o=1&f=&page="+page;
         String responseHTML = HttpUtil.sendGet(originalClient, url);
 
         String userPattern = "href='\\/u\\/(.+?)'>(.+?)<\\/a><\\/td>";

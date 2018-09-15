@@ -56,6 +56,7 @@ public class HttpUtil {
                 request.releaseConnection();
             } catch (Exception e) {
                 e.printStackTrace();
+                System.out.println("Reattempting GET request...");
             }
         }
 
@@ -99,6 +100,7 @@ public class HttpUtil {
                 post.releaseConnection();
             } catch (Exception e) {
                 e.printStackTrace();
+                System.out.println("Reattempting POST request...");
             }
         }
 
